@@ -46,7 +46,7 @@ if not st.session_state.authenticated:
 
 # --- API CONSTANTS ---
 MTP_API_URL = "https://morethanpanel.com/api/v2"
-JAP_API_URL = "https://justanotherpanel.com/api/v2"
+JAP_API_URL = "https://godofpanel.com/api/v2"
 
 # --- HELPER FUNCTIONS ---
 
@@ -146,7 +146,7 @@ if use_comments:
             cm_api_key = None
             cm_url = None
         else:
-            cm_service_id = 7118
+            cm_service_id = 353
             cm_api_key = JAP_API_KEY
             cm_url = JAP_API_URL
     else:
