@@ -8,13 +8,13 @@ st.set_page_config(page_title="TikTok Auto-Order", page_icon="🚀")
 try:
     SECRET_CODE = st.secrets["PASSWORD"]
     MTP_API_KEY = st.secrets["SMM_KEY"]
-    # Try to get JAP key, handle gracefully if missing
+    # We use the existing secret name 'JAP_KEY' but it will now hold the GodOfPanel API Key
     try:
-        JAP_API_KEY = st.secrets["JAP_KEY"]
+        GOP_API_KEY = st.secrets["JAP_KEY"]
     except KeyError:
-        JAP_API_KEY = None
+        GOP_API_KEY = None
 except FileNotFoundError:
-    st.error("Secrets not found. Please set PASSWORD, SMM_KEY, and JAP_KEY in your .streamlit/secrets.toml or Streamlit Cloud settings.")
+    st.error("Secrets not found. Please set PASSWORD, SMM_KEY, and JAP_KEY in your .streamlit/secrets.toml.")
     st.stop()
 
 # Check query parameters (The "Special Link" logic)
@@ -46,7 +46,11 @@ if not st.session_state.authenticated:
 
 # --- API CONSTANTS ---
 MTP_API_URL = "https://morethanpanel.com/api/v2"
-JAP_API_URL = "https://godofpanel.com/api/v2"
+GOP_API_URL = "https://godofpanel.com/api/v2"
+
+# IMPORTANT: Ensure this ID matches the "Custom Comments" service ID on GodOfPanel
+GOP_COMMENTS_ID = 353 
+MTP_COMMENTS_ID = 4650
 
 # --- HELPER FUNCTIONS ---
 
@@ -60,10 +64,6 @@ def place_order(api_url, api_key, service_id, link, quantity=None, comments=None
     
     if comments:
         payload['comments'] = comments
-        # For custom comments, quantity is usually calculated automatically by the server 
-        # based on lines, but some panels require sending the count explicitly.
-        # However, typical SMM API for 'custom_comments' type often ignores 'quantity' field 
-        # or expects it to match the line count. We'll rely on the comments field primarily.
     elif quantity:
         payload['quantity'] = quantity
 
@@ -91,7 +91,7 @@ col1, col2 = st.columns(2)
 with col1:
     comment_panel_choice = st.radio(
         "Select Panel for Comments:",
-        ("MoreThanPanel", "JustAnotherPanel"),
+        ("MoreThanPanel", "GodOfPanel"),
         help="Choose which provider to use for the comments service."
     )
 
@@ -140,18 +140,18 @@ if use_comments:
         st.warning("You selected Comments, but the text box is empty.")
     
     # Determine ID and Keys based on panel choice
-    if comment_panel_choice == "JustAnotherPanel":
-        if not JAP_API_KEY:
-            st.error("JAP_KEY not found in secrets. Cannot use JustAnotherPanel.")
+    if comment_panel_choice == "GodOfPanel":
+        if not GOP_API_KEY:
+            st.error("JAP_KEY not found in secrets. Cannot use GodOfPanel.")
             cm_api_key = None
             cm_url = None
         else:
-            cm_service_id = 353
-            cm_api_key = JAP_API_KEY
-            cm_url = JAP_API_URL
+            cm_service_id = GOP_COMMENTS_ID
+            cm_api_key = GOP_API_KEY
+            cm_url = GOP_API_URL
     else:
         # MoreThanPanel
-        cm_service_id = 4650
+        cm_service_id = MTP_COMMENTS_ID
         cm_api_key = MTP_API_KEY
         cm_url = MTP_API_URL
 
@@ -215,9 +215,11 @@ if st.button("Place Selected Orders", type="primary"):
             is_success = 'order' in resp
             
             # Format result for table
+            provider_name = "GodOfPanel" if "godofpanel" in order.get('api_url', '') else "MTP"
+            
             results.append({
                 "Service": order['name'],
-                "Provider": "JAP" if "JustAnotherPanel" in order.get('api_url', '') else "MTP",
+                "Provider": provider_name,
                 "Status": "✅ Success" if is_success else "❌ Failed",
                 "Order ID / Error": resp.get('order', resp)
             })
