@@ -8,13 +8,21 @@ st.set_page_config(page_title="TikTok Auto-Order", page_icon="🚀")
 try:
     SECRET_CODE = st.secrets["PASSWORD"]
     MTP_API_KEY = st.secrets["SMM_KEY"]
-    # We use the existing secret name 'JAP_KEY' but it will now hold the GodOfPanel API Key
+    
+    # GodOfPanel Key
     try:
         GOP_API_KEY = st.secrets["JAP_KEY"]
     except KeyError:
         GOP_API_KEY = None
+
+    # Emergency Panel Key (JustAnotherPanel)
+    try:
+        EME_API_KEY = st.secrets["EME"]
+    except KeyError:
+        EME_API_KEY = None
+
 except FileNotFoundError:
-    st.error("Secrets not found. Please set PASSWORD, SMM_KEY, and JAP_KEY in your .streamlit/secrets.toml.")
+    st.error("Secrets not found. Please set PASSWORD, SMM_KEY, JAP_KEY, and EME in your .streamlit/secrets.toml.")
     st.stop()
 
 # Check query parameters (The "Special Link" logic)
@@ -47,10 +55,12 @@ if not st.session_state.authenticated:
 # --- API CONSTANTS ---
 MTP_API_URL = "https://morethanpanel.com/api/v2"
 GOP_API_URL = "https://godofpanel.com/api/v2"
+EME_API_URL = "https://justanotherpanel.com/api/v2"
 
-# IMPORTANT: Ensure this ID matches the "Custom Comments" service ID on GodOfPanel
+# SERVICE IDs
 GOP_COMMENTS_ID = 353 
 MTP_COMMENTS_ID = 4650
+EME_COMMENTS_ID = 7118 # TikTok Comments [CUSTOM] for Emergency Panel
 
 # --- HELPER FUNCTIONS ---
 
@@ -91,12 +101,12 @@ col1, col2 = st.columns(2)
 with col1:
     comment_panel_choice = st.radio(
         "Select Panel for Comments:",
-        ("MoreThanPanel", "GodOfPanel"),
-        help="Choose which provider to use for the comments service."
+        ("MoreThanPanel", "GodOfPanel", "Emergency Panel"),
+        help="Choose exactly one provider for the comments service."
     )
 
 with col2:
-    st.info("Note: All other services (Likes, Shares, Saves) will use MoreThanPanel.")
+    st.info("Note: All other services (Likes, Shares, Saves) will use MoreThanPanel regardless of this choice.")
 
 # Manual Comment Input
 raw_comments = st.text_area(
@@ -140,22 +150,37 @@ if use_comments:
         st.warning("You selected Comments, but the text box is empty.")
     
     # Determine ID and Keys based on panel choice
+    cm_api_key = None
+    cm_url = None
+    cm_service_id = None
+    
     if comment_panel_choice == "GodOfPanel":
         if not GOP_API_KEY:
             st.error("JAP_KEY not found in secrets. Cannot use GodOfPanel.")
-            cm_api_key = None
-            cm_url = None
         else:
             cm_service_id = GOP_COMMENTS_ID
             cm_api_key = GOP_API_KEY
             cm_url = GOP_API_URL
+            
+    elif comment_panel_choice == "Emergency Panel":
+        if not EME_API_KEY:
+            st.error("EME key not found in secrets. Cannot use Emergency Panel.")
+        else:
+            cm_service_id = EME_COMMENTS_ID
+            cm_api_key = EME_API_KEY
+            cm_url = EME_API_URL
+            
     else:
-        # MoreThanPanel
-        cm_service_id = MTP_COMMENTS_ID
-        cm_api_key = MTP_API_KEY
-        cm_url = MTP_API_URL
+        # Default: MoreThanPanel
+        if not MTP_API_KEY:
+            st.error("SMM_KEY not found. Cannot use MoreThanPanel.")
+        else:
+            cm_service_id = MTP_COMMENTS_ID
+            cm_api_key = MTP_API_KEY
+            cm_url = MTP_API_URL
 
-    if cm_api_key:
+    # Only append if we successfully set the keys
+    if cm_api_key and cm_url and cm_service_id:
         selected_orders.append({
             "name": f"Custom Comments ({comment_panel_choice})",
             "id": cm_service_id,
@@ -215,7 +240,13 @@ if st.button("Place Selected Orders", type="primary"):
             is_success = 'order' in resp
             
             # Format result for table
-            provider_name = "GodOfPanel" if "godofpanel" in order.get('api_url', '') else "MTP"
+            provider_raw = order.get('api_url', '')
+            if "godofpanel" in provider_raw:
+                provider_name = "GodOfPanel"
+            elif "justanotherpanel" in provider_raw:
+                provider_name = "Emergency (JAP)"
+            else:
+                provider_name = "MTP"
             
             results.append({
                 "Service": order['name'],
